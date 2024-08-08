@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,8 +8,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { UserCircle, Send, RefreshCw, LogOut } from "lucide-react";
+import { UserCircle, Send, RefreshCw, LogOut, Save } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const API_URL = 'http://localhost:3000/api'; // Replace with your actual API URL
 
@@ -59,11 +60,49 @@ const sendMessage = async ({ candidateId, message }) => {
   return response.json();
 };
 
+const fetchMessageTemplates = async () => {
+  const response = await fetch(`${API_URL}/message-templates`, {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+    },
+  });
+  if (!response.ok) throw new Error('Failed to fetch message templates');
+  return response.json();
+};
+
+const saveMessageTemplate = async (template) => {
+  const response = await fetch(`${API_URL}/message-templates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+    },
+    body: JSON.stringify(template),
+  });
+  if (!response.ok) throw new Error('Failed to save message template');
+  return response.json();
+};
+
 const Index = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, notifications, addNotification } = useAuth();
   const [messageText, setMessageText] = useState('');
+  const [templateName, setTemplateName] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // Check for new notifications every 30 seconds
+    const intervalId = setInterval(() => {
+      // This is a mock function. In a real app, you'd fetch notifications from the server
+      const mockFetchNotifications = () => {
+        const newNotification = { id: Date.now(), message: "You have a new match!" };
+        addNotification(newNotification);
+      };
+      mockFetchNotifications();
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [addNotification]);
 
   const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ['profile'],
@@ -83,6 +122,20 @@ const Index = () => {
     queryFn: fetchCandidates,
   });
 
+  const { data: messageTemplates, isLoading: isTemplatesLoading } = useQuery({
+    queryKey: ['messageTemplates'],
+    queryFn: fetchMessageTemplates,
+  });
+
+  const saveTemplateMutation = useMutation({
+    mutationFn: saveMessageTemplate,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['messageTemplates']);
+      toast({ title: "Template Saved", description: "Your message template has been saved." });
+      setTemplateName('');
+    },
+  });
+
   const sendMessageMutation = useMutation({
     mutationFn: sendMessage,
     onSuccess: () => {
@@ -92,7 +145,7 @@ const Index = () => {
     },
   });
 
-  if (isProfileLoading || isCandidatesLoading) {
+  if (isProfileLoading || isCandidatesLoading || isTemplatesLoading) {
     return (
       <div className="container mx-auto p-4">
         <Skeleton className="w-[250px] h-[20px] rounded-full mb-6" />
@@ -114,6 +167,7 @@ const Index = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="profile">Your Profile</TabsTrigger>
           <TabsTrigger value="candidates">Potential Matches</TabsTrigger>
+          <TabsTrigger value="templates">Message Templates</TabsTrigger>
         </TabsList>
         
         <TabsContent value="profile">
@@ -195,7 +249,65 @@ const Index = () => {
             </CardContent>
           </Card>
         </TabsContent>
+        
+        <TabsContent value="templates">
+          <Card>
+            <CardHeader>
+              <CardTitle>Message Templates</CardTitle>
+              <CardDescription>Create and manage your message templates</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="templateName">Template Name</Label>
+                  <Input
+                    id="templateName"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    placeholder="Enter template name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="templateContent">Template Content</Label>
+                  <Textarea
+                    id="templateContent"
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder="Enter your message template here"
+                  />
+                </div>
+                <Button onClick={() => saveTemplateMutation.mutate({ name: templateName, content: messageText })}>
+                  <Save className="mr-2 h-4 w-4" /> Save Template
+                </Button>
+                <div className="mt-4">
+                  <Label>Saved Templates</Label>
+                  <Select onValueChange={(value) => setMessageText(messageTemplates.find(t => t.id === value).content)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {messageTemplates?.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {notifications.length > 0 && (
+        <div className="fixed bottom-4 right-4 bg-white p-4 rounded-md shadow-lg">
+          <h3 className="font-bold mb-2">Notifications</h3>
+          {notifications.map((notification) => (
+            <div key={notification.id} className="mb-2">
+              {notification.message}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

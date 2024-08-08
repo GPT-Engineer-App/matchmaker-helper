@@ -6,6 +6,7 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     // Check if user is logged in (e.g., by checking localStorage or a token)
@@ -29,8 +30,12 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('authToken');
   };
 
+  const addNotification = (notification) => {
+    setNotifications(prev => [...prev, notification]);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, notifications, addNotification }}>
       {children}
     </AuthContext.Provider>
   );
