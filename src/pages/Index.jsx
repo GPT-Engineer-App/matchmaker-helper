@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,7 +93,12 @@ const Index = () => {
   });
 
   if (isProfileLoading || isCandidatesLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="container mx-auto p-4">
+        <Skeleton className="w-[250px] h-[20px] rounded-full mb-6" />
+        <Skeleton className="w-full h-[300px] rounded-md" />
+      </div>
+    );
   }
 
   return (
@@ -119,7 +125,13 @@ const Index = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" value={profile.name} onChange={(e) => updateProfileMutation.mutate({ ...profile, name: e.target.value })} />
+                <Input 
+                  id="name" 
+                  name="name" 
+                  value={profile.name} 
+                  onChange={(e) => updateProfileMutation.mutate({ ...profile, name: e.target.value })}
+                  aria-label="Name"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="skills">Skills</Label>
