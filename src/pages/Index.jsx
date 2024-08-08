@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,58 +7,102 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { UserCircle, Send, RefreshCw } from "lucide-react";
+import { UserCircle, Send, RefreshCw, LogOut } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+const API_URL = 'http://localhost:3000/api'; // Replace with your actual API URL
+
+const fetchProfile = async () => {
+  const response = await fetch(`${API_URL}/profile`, {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+    },
+  });
+  if (!response.ok) throw new Error('Failed to fetch profile');
+  return response.json();
+};
+
+const updateProfile = async (profile) => {
+  const response = await fetch(`${API_URL}/profile`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+    },
+    body: JSON.stringify(profile),
+  });
+  if (!response.ok) throw new Error('Failed to update profile');
+  return response.json();
+};
+
+const fetchCandidates = async () => {
+  const response = await fetch(`${API_URL}/candidates`, {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+    },
+  });
+  if (!response.ok) throw new Error('Failed to fetch candidates');
+  return response.json();
+};
+
+const sendMessage = async ({ candidateId, message }) => {
+  const response = await fetch(`${API_URL}/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+    },
+    body: JSON.stringify({ candidateId, message }),
+  });
+  if (!response.ok) throw new Error('Failed to send message');
+  return response.json();
+};
 
 const Index = () => {
-  const [profile, setProfile] = useState({
-    name: '',
-    skills: '',
-    availability: '',
-    preferences: '',
-  });
-  const [candidates, setCandidates] = useState([]);
+  const { user, logout } = useAuth();
+  const [messageText, setMessageText] = useState('');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const handleProfileUpdate = (e) => {
-    setProfile({ ...profile, [e.target.name]: e.target.value });
-  };
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
+    queryKey: ['profile'],
+    queryFn: fetchProfile,
+  });
 
-  const fetchCandidates = () => {
-    // Simulating API call to fetch candidates
-    const mockCandidates = [
-      { id: 1, name: 'Alice', skills: 'Gardening, Cooking', availability: 'June-August', lastContacted: null },
-      { id: 2, name: 'Bob', skills: 'Carpentry, Teaching', availability: 'July-September', lastContacted: '2023-05-01' },
-      { id: 3, name: 'Charlie', skills: 'Web Development, Photography', availability: 'August-October', lastContacted: null },
-    ];
-    setCandidates(mockCandidates);
-    toast({
-      title: "Candidates Fetched",
-      description: `Found ${mockCandidates.length} potential matches.`,
-    });
-  };
+  const updateProfileMutation = useMutation({
+    mutationFn: updateProfile,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['profile']);
+      toast({ title: "Profile Updated", description: "Your profile has been successfully updated." });
+    },
+  });
 
-  const sendMessage = (candidateId) => {
-    // Simulating sending a message
-    setCandidates(candidates.map(c => 
-      c.id === candidateId ? {...c, lastContacted: new Date().toISOString().split('T')[0]} : c
-    ));
-    toast({
-      title: "Message Sent",
-      description: "Your personalized message has been sent to the candidate.",
-    });
-  };
+  const { data: candidates, isLoading: isCandidatesLoading, refetch: refetchCandidates } = useQuery({
+    queryKey: ['candidates'],
+    queryFn: fetchCandidates,
+  });
 
-  const sendReminder = (candidateId) => {
-    // Simulating sending a reminder
-    toast({
-      title: "Reminder Sent",
-      description: "A reminder has been sent to the candidate.",
-    });
-  };
+  const sendMessageMutation = useMutation({
+    mutationFn: sendMessage,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['candidates']);
+      toast({ title: "Message Sent", description: "Your message has been sent to the candidate." });
+      setMessageText('');
+    },
+  });
+
+  if (isProfileLoading || isCandidatesLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">Workaway Automation Tool</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Workaway Automation Tool</h1>
+        <Button onClick={logout} variant="outline">
+          <LogOut className="mr-2 h-4 w-4" /> Logout
+        </Button>
+      </div>
       
       <Tabs defaultValue="profile">
         <TabsList className="mb-4">
@@ -74,26 +119,21 @@ const Index = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" value={profile.name} onChange={handleProfileUpdate} />
+                <Input id="name" name="name" value={profile.name} onChange={(e) => updateProfileMutation.mutate({ ...profile, name: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="skills">Skills</Label>
-                <Input id="skills" name="skills" value={profile.skills} onChange={handleProfileUpdate} />
+                <Input id="skills" name="skills" value={profile.skills} onChange={(e) => updateProfileMutation.mutate({ ...profile, skills: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="availability">Availability</Label>
-                <Input id="availability" name="availability" value={profile.availability} onChange={handleProfileUpdate} />
+                <Input id="availability" name="availability" value={profile.availability} onChange={(e) => updateProfileMutation.mutate({ ...profile, availability: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="preferences">Preferences</Label>
-                <Textarea id="preferences" name="preferences" value={profile.preferences} onChange={handleProfileUpdate} />
+                <Textarea id="preferences" name="preferences" value={profile.preferences} onChange={(e) => updateProfileMutation.mutate({ ...profile, preferences: e.target.value })} />
               </div>
             </CardContent>
-            <CardFooter>
-              <Button onClick={() => toast({ title: "Profile Updated", description: "Your profile has been successfully updated." })}>
-                Save Profile
-              </Button>
-            </CardFooter>
           </Card>
         </TabsContent>
         
@@ -104,8 +144,8 @@ const Index = () => {
               <CardDescription>Find and contact suitable candidates</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={fetchCandidates} className="mb-4">
-                <RefreshCw className="mr-2 h-4 w-4" /> Fetch Candidates
+              <Button onClick={() => refetchCandidates()} className="mb-4">
+                <RefreshCw className="mr-2 h-4 w-4" /> Refresh Candidates
               </Button>
               <div className="space-y-4">
                 {candidates.map((candidate) => (
@@ -120,16 +160,22 @@ const Index = () => {
                         Availability: {candidate.availability}
                       </CardDescription>
                     </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        placeholder="Type your message here..."
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        className="mb-2"
+                      />
+                    </CardContent>
                     <CardFooter className="flex justify-between">
-                      <Button onClick={() => sendMessage(candidate.id)} disabled={candidate.lastContacted}>
+                      <Button 
+                        onClick={() => sendMessageMutation.mutate({ candidateId: candidate.id, message: messageText })}
+                        disabled={!messageText.trim()}
+                      >
                         <Send className="mr-2 h-4 w-4" />
-                        {candidate.lastContacted ? 'Message Sent' : 'Send Message'}
+                        Send Message
                       </Button>
-                      {candidate.lastContacted && (
-                        <Button variant="outline" onClick={() => sendReminder(candidate.id)}>
-                          Send Reminder
-                        </Button>
-                      )}
                     </CardFooter>
                   </Card>
                 ))}
