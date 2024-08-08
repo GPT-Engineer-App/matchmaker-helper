@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -38,26 +37,26 @@ const Login = () => {
           <CardTitle className="text-2xl font-bold text-center">Login</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                {...register('email')}
+                aria-invalid={errors.email ? "true" : "false"}
               />
+              {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
+                {...register('password')}
+                aria-invalid={errors.password ? "true" : "false"}
               />
+              {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
             </div>
             <Button type="submit" className="w-full">
               Log in
