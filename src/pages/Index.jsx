@@ -13,87 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-
-const API_URL = 'http://localhost:3000/api'; // Replace with your actual API URL
-
-const fetchProfile = async () => {
-  const response = await fetch(`${API_URL}/profile`, {
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    },
-  });
-  if (!response.ok) throw new Error('Failed to fetch profile');
-  return response.json();
-};
-
-const updateProfile = async (profile) => {
-  const response = await fetch(`${API_URL}/profile`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    },
-    body: JSON.stringify(profile),
-  });
-  if (!response.ok) throw new Error('Failed to update profile');
-  return response.json();
-};
-
-const fetchTravelers = async () => {
-  const response = await fetch(`${API_URL}/travelers`, {
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    },
-  });
-  if (!response.ok) throw new Error('Failed to fetch travelers');
-  return response.json();
-};
-
-const sendMessage = async ({ travelerId, message }) => {
-  const response = await fetch(`${API_URL}/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    },
-    body: JSON.stringify({ travelerId, message }),
-  });
-  if (!response.ok) throw new Error('Failed to send message');
-  return response.json();
-};
-
-const fetchMessageTemplates = async () => {
-  const response = await fetch(`${API_URL}/message-templates`, {
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    },
-  });
-  if (!response.ok) throw new Error('Failed to fetch message templates');
-  return response.json();
-};
-
-const saveMessageTemplate = async (template) => {
-  const response = await fetch(`${API_URL}/message-templates`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    },
-    body: JSON.stringify(template),
-  });
-  if (!response.ok) throw new Error('Failed to save message template');
-  return response.json();
-};
-
-const fetchReviews = async () => {
-  const response = await fetch(`${API_URL}/reviews`, {
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    },
-  });
-  if (!response.ok) throw new Error('Failed to fetch reviews');
-  return response.json();
-};
+import { fetchHostProfile, updateHostProfile, fetchTravelers, sendMessage, fetchMessageTemplates, saveMessageTemplate, fetchReviews } from '../services/workawayApi';
 
 const Index = () => {
   const { user, logout, notifications, addNotification } = useAuth();
@@ -116,21 +36,21 @@ const Index = () => {
   }, [addNotification]);
 
   const { data: profile, isLoading: isProfileLoading } = useQuery({
-    queryKey: ['profile'],
-    queryFn: fetchProfile,
+    queryKey: ['hostProfile'],
+    queryFn: fetchHostProfile,
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: updateProfile,
+    mutationFn: updateHostProfile,
     onSuccess: () => {
-      queryClient.invalidateQueries(['profile']);
+      queryClient.invalidateQueries(['hostProfile']);
       toast({ title: "Profile Updated", description: "Your host profile has been successfully updated." });
     },
   });
 
   const { data: travelers, isLoading: isTravelersLoading, refetch: refetchTravelers } = useQuery({
     queryKey: ['travelers'],
-    queryFn: fetchTravelers,
+    queryFn: () => fetchTravelers({}), // You can add filters here if needed
   });
 
   const { data: messageTemplates, isLoading: isTemplatesLoading } = useQuery({
@@ -139,7 +59,7 @@ const Index = () => {
   });
 
   const { data: reviews, isLoading: isReviewsLoading } = useQuery({
-    queryKey: ['reviews'],
+    queryKey: ['hostReviews'],
     queryFn: fetchReviews,
   });
 
@@ -153,7 +73,7 @@ const Index = () => {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: sendMessage,
+    mutationFn: ({ travelerId, message }) => sendMessage(travelerId, message),
     onSuccess: () => {
       queryClient.invalidateQueries(['travelers']);
       toast({ title: "Message Sent", description: "Your message has been sent to the traveler." });
@@ -195,12 +115,12 @@ const Index = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="projectDescription">Project Description</Label>
+                <Label htmlFor="description">Host Description</Label>
                 <Textarea 
-                  id="projectDescription" 
-                  value={profile.projectDescription} 
-                  onChange={(e) => updateProfileMutation.mutate({ ...profile, projectDescription: e.target.value })}
-                  placeholder="Describe your project and what you're looking for in a traveler"
+                  id="description" 
+                  value={profile.description} 
+                  onChange={(e) => updateProfileMutation.mutate({ ...profile, description: e.target.value })}
+                  placeholder="Describe yourself and your project"
                 />
               </div>
               <div className="space-y-2">
@@ -214,16 +134,25 @@ const Index = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="helpNeeded">Type of Help Needed</Label>
-                <Input 
-                  id="helpNeeded" 
-                  value={profile.helpNeeded} 
-                  onChange={(e) => updateProfileMutation.mutate({ ...profile, helpNeeded: e.target.value })}
-                  placeholder="e.g., Gardening, Teaching, Construction"
-                />
+                <Label htmlFor="helpTypes">Types of Help Needed</Label>
+                <Select 
+                  id="helpTypes" 
+                  value={profile.helpTypes} 
+                  onValueChange={(value) => updateProfileMutation.mutate({ ...profile, helpTypes: value })}
+                  multiple
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select help types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['Gardening', 'Teaching', 'Construction', 'Cooking', 'Childcare'].map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="accommodation">Accommodation Details</Label>
+                <Label htmlFor="accommodation">Accommodation</Label>
                 <Textarea 
                   id="accommodation" 
                   value={profile.accommodation} 
@@ -232,14 +161,22 @@ const Index = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="languages">Languages Spoken</Label>
-                <Input 
+                <Label htmlFor="languages">Languages</Label>
+                <Select 
                   id="languages" 
                   value={profile.languages} 
-                  onChange={(e) => updateProfileMutation.mutate({ ...profile, languages: e.target.value })}
-                  placeholder="e.g., English, Spanish, French"
-                  icon={<Globe className="h-4 w-4" />}
-                />
+                  onValueChange={(value) => updateProfileMutation.mutate({ ...profile, languages: value })}
+                  multiple
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select languages" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['English', 'Spanish', 'French', 'German', 'Italian'].map((lang) => (
+                      <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Available Dates</Label>
