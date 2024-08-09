@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { UserCircle, Send, RefreshCw, LogOut, Save, Calendar, MapPin, Globe, Star } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DatePickerWithRange } from "@/components/ui/date-range-picker";
+import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 
 const API_URL = 'http://localhost:3000/api'; // Replace with your actual API URL
@@ -243,7 +243,26 @@ const Index = () => {
               </div>
               <div className="space-y-2">
                 <Label>Available Dates</Label>
-                <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+                <div className="flex space-x-2">
+                  <div>
+                    <Label>From</Label>
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.from}
+                      onSelect={(date) => setDateRange(prev => ({ ...prev, from: date }))}
+                      className="rounded-md border"
+                    />
+                  </div>
+                  <div>
+                    <Label>To</Label>
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.to}
+                      onSelect={(date) => setDateRange(prev => ({ ...prev, to: date }))}
+                      className="rounded-md border"
+                    />
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
